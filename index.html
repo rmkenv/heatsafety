@@ -471,12 +471,12 @@
         body: JSON.stringify({ temp, humidity, aqi, wbTemp, city }),
       });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'API error');
+      if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
       aiEl.textContent = data.assessment;
-      modelEl.textContent = 'gpt-oss:20b via Ollama Cloud';
+      modelEl.textContent = 'gpt-oss:20b-cloud via Ollama Cloud';
     } catch (e) {
       aiEl.textContent = 'Assessment unavailable. Review the metrics above manually.';
-      console.error(e);
+      console.error('Assessment error:', e.message);
     }
   }
 
