@@ -502,11 +502,29 @@
     }
   }
 
-  async function geocode(query) {
+  // Nominatim handles zip codes, city names, full addresses
+  async function geocodeNominatim(query) {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=1`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await resp.json();
+    const r = data[0];
+    if (!r) throw new Error('Not found');
+    const a = r.address;
+    const city = a.city || a.town || a.village || a.county || a.state || r.display_name.split(',')[0];
+    const state = a.state_code || a.country_code?.toUpperCase() || '';
+    return {
+      lat:  parseFloat(r.lat),
+      lon:  parseFloat(r.lon),
+      name: [city, state].filter(Boolean).join(', '),
+    };
+  }
+
+  // Open-Meteo geocoding as fallback (good for international city names)
+  async function geocodeOpenMeteo(query) {
     const resp = await fetch(`${GEOCODE_BASE}?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
     const data = await resp.json();
     const r = data.results?.[0];
-    if (!r) throw new Error('Location not found');
+    if (!r) throw new Error('Not found');
     return {
       lat:  r.latitude,
       lon:  r.longitude,
@@ -514,15 +532,23 @@
     };
   }
 
+  async function geocode(query) {
+    // Try Nominatim first — handles US zips, addresses, city names
+    try { return await geocodeNominatim(query); } catch (_) {}
+    // Fall back to Open-Meteo geocoder
+    return await geocodeOpenMeteo(query);
+  }
+
   async function handleSearch() {
     const q = document.getElementById('locInput').value.trim();
     if (!q) return;
+    setError('');
     document.getElementById('locLabel').textContent = 'Searching...';
     try {
       const loc = await geocode(q);
       await fetchWeather(loc.lat, loc.lon, loc.name);
     } catch (e) {
-      setError('Location not found. Try a city name or zip code.');
+      setError('Location not found. Try a city name, zip code, or full address.');
       document.getElementById('locLabel').textContent = '';
     }
   }
