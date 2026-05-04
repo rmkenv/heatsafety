@@ -305,33 +305,36 @@
 <div class="app">
 
   <div class="header">
-    <span class="header-title">Outdoor Safety Monitor</span>
-    <span class="header-loc" id="locLabel">Locating...</span>
+    <span class="header-title" id="appTitle">Outdoor Safety Monitor</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn lang-btn" id="langToggle" onclick="toggleLang()" style="padding:5px 10px;font-size:12px;">🌐 Español</button>
+      <span class="header-loc" id="locLabel">Locating...</span>
+    </div>
   </div>
 
   <div class="safety-banner level-safe" id="safetyBanner">
     <div class="safety-icon" id="safetyIcon">–</div>
     <div>
-      <div class="safety-level">Outdoor safety status</div>
+      <div class="safety-level" id="safetyLevel">Outdoor safety status</div>
       <div class="safety-text" id="safetyText">Loading conditions...</div>
     </div>
   </div>
 
   <div class="metrics">
     <div class="metric">
-      <div class="metric-label">Temperature</div>
+      <div class="metric-label" id="labelTemp">Temperature</div>
       <div class="metric-val" id="tempVal">--</div>
       <div class="metric-unit">°F</div>
       <div class="metric-bar"><div class="metric-fill" id="tempBar" style="width:0%;background:#d85a30"></div></div>
     </div>
     <div class="metric">
-      <div class="metric-label">Air Quality (AQI)</div>
+      <div class="metric-label" id="labelAqi">Air Quality (AQI)</div>
       <div class="metric-val" id="aqiVal">--</div>
       <div class="metric-unit" id="aqiDesc">Index</div>
       <div class="metric-bar"><div class="metric-fill" id="aqiBar" style="width:0%;background:#378add"></div></div>
     </div>
     <div class="metric">
-      <div class="metric-label">Wet Bulb Temp</div>
+      <div class="metric-label" id="labelWb">Wet Bulb Temp</div>
       <div class="metric-val" id="wbVal">--</div>
       <div class="metric-unit">°F</div>
       <div class="metric-bar"><div class="metric-fill" id="wbBar" style="width:0%;background:#ef9f27"></div></div>
@@ -339,19 +342,19 @@
   </div>
 
   <div class="wbgt-scale">
-    <div class="wbgt-title">Wet Bulb Globe Temperature Risk Scale</div>
+    <div class="wbgt-title" id="wbgtTitle">Wet Bulb Globe Temperature Risk Scale</div>
     <div class="scale-bar">
       <div class="scale-needle" id="wbNeedle" style="left:0%"></div>
     </div>
     <div class="scale-labels">
-      <span>Low (60°F)</span>
-      <span>Caution (75°F)</span>
-      <span>High risk (90°F+)</span>
+      <span id="scaleLow">Low (60°F)</span>
+      <span id="scaleMid">Caution (75°F)</span>
+      <span id="scaleHigh">High risk (90°F+)</span>
     </div>
   </div>
 
   <div class="ai-section">
-    <div class="ai-label">AI Safety Assessment</div>
+    <div class="ai-label" id="aiLabel">AI Safety Assessment</div>
     <div class="ai-text" id="aiText">
       <div class="dots">
         <div class="dot"></div><div class="dot"></div><div class="dot"></div>
@@ -362,15 +365,15 @@
 
   <div class="controls">
     <input class="loc-input" id="locInput" type="text" placeholder="City, zip code, or address..." />
-    <button class="btn" onclick="handleSearch()">Check location</button>
-    <button class="btn" onclick="useGPS()">Use GPS</button>
+    <button class="btn" id="btnSearch" onclick="handleSearch()">Check location</button>
+    <button class="btn" id="btnGps" onclick="useGPS()">Use GPS</button>
   </div>
   <div class="error-msg" id="errorMsg"></div>
 
   <div class="footer">
     <span>Weather &amp; AQI: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></span>
-    <span>Assessment: <a href="https://ollama.com" target="_blank" rel="noopener">Ollama Cloud</a> / gpt-oss:20b</span>
-    <span>Wet bulb: Stull (2011)</span>
+    <span id="footerAssessment">Assessment: <a href="https://ollama.com" target="_blank" rel="noopener">Ollama Cloud</a> / gpt-oss:20b</span>
+    <span id="footerWb">Wet bulb: Stull (2011)</span>
   </div>
 
 </div>
@@ -395,12 +398,13 @@
   }
 
   function aqiLabel(v) {
-    if (v <= 50)  return 'Good';
-    if (v <= 100) return 'Moderate';
-    if (v <= 150) return 'Unhealthy (sensitive)';
-    if (v <= 200) return 'Unhealthy';
-    if (v <= 300) return 'Very Unhealthy';
-    return 'Hazardous';
+    const labels = STRINGS[lang]?.aqi || STRINGS.en.aqi;
+    if (v <= 50)  return labels[0];
+    if (v <= 100) return labels[1];
+    if (v <= 150) return labels[2];
+    if (v <= 200) return labels[3];
+    if (v <= 300) return labels[4];
+    return labels[5];
   }
 
   function aqiColor(v) {
@@ -418,12 +422,15 @@
     return 'safe';
   }
 
-  const LEVEL_META = {
-    safe:    { icon: '✓', text: 'Safe for outdoor activity' },
-    caution: { icon: '!', text: 'Use caution outdoors' },
-    warning: { icon: '⚠', text: 'Limit outdoor exertion' },
-    danger:  { icon: '✕', text: 'Dangerous outdoor conditions' },
-  };
+  function getLevelMeta(level) {
+    const s = STRINGS[lang] || STRINGS.en;
+    return {
+      safe:    { icon: '✓', text: s.safeText },
+      caution: { icon: '!', text: s.cautionText },
+      warning: { icon: '⚠', text: s.warningText },
+      danger:  { icon: '✕', text: s.dangerText },
+    }[level];
+  }
 
   function updateUI() {
     const { temp, humidity, aqi, wbTemp, city } = appState;
@@ -448,7 +455,7 @@
     document.getElementById('wbNeedle').style.left = needlePct + '%';
 
     const level = safetyLevel(temp, aqi, wbTemp);
-    const meta  = LEVEL_META[level];
+    const meta  = getLevelMeta(level);
     const banner = document.getElementById('safetyBanner');
     banner.className = 'safety-banner level-' + level;
     document.getElementById('safetyIcon').textContent = meta.icon;
@@ -475,7 +482,7 @@
       aiEl.textContent = data.assessment;
       modelEl.textContent = 'gpt-oss:20b-cloud via Ollama Cloud';
     } catch (e) {
-      aiEl.textContent = 'Assessment unavailable. Review the metrics above manually.';
+      aiEl.textContent = t('assessError');
       console.error('Assessment error:', e.message);
     }
   }
@@ -497,7 +504,7 @@
       appState = { temp, humidity, aqi, wbTemp: calcWetBulbF(temp, humidity), city: cityName };
       updateUI();
     } catch (e) {
-      setError('Failed to load weather data. Try again.');
+      setError(t('weatherError'));
       document.getElementById('locLabel').textContent = '';
     }
   }
@@ -543,12 +550,12 @@
     const q = document.getElementById('locInput').value.trim();
     if (!q) return;
     setError('');
-    document.getElementById('locLabel').textContent = 'Searching...';
+    document.getElementById('locLabel').textContent = t('searching');
     try {
       const loc = await geocode(q);
       await fetchWeather(loc.lat, loc.lon, loc.name);
     } catch (e) {
-      setError('Location not found. Try a city name, zip code, or full address.');
+      setError(t('notFound'));
       document.getElementById('locLabel').textContent = '';
     }
   }
@@ -558,7 +565,7 @@
       setError('GPS not available in this browser.');
       return;
     }
-    document.getElementById('locLabel').textContent = 'Locating...';
+    document.getElementById('locLabel').textContent = t('locating');
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const { latitude: lat, longitude: lon } = pos.coords;
@@ -569,10 +576,10 @@
           const st   = d.address?.state_code || '';
           await fetchWeather(lat, lon, `${city}${st ? ', ' + st : ''}`);
         } catch {
-          await fetchWeather(lat, lon, 'Current location');
+          await fetchWeather(lat, lon, t('currentLoc'));
         }
       },
-      () => setError('GPS permission denied. Enter a location manually.')
+      () => setError(t('gpsError'))
     );
   }
 
@@ -584,7 +591,113 @@
     if (e.key === 'Enter') handleSearch();
   });
 
-  // Auto-load on start
+  // ── i18n ──────────────────────────────────────────────
+  let lang = 'en';
+
+  const STRINGS = {
+    en: {
+      appTitle: 'Outdoor Safety Monitor',
+      safetyLevel: 'Outdoor safety status',
+      labelTemp: 'Temperature',
+      labelAqi: 'Air Quality (AQI)',
+      labelWb: 'Wet Bulb Temp',
+      wbgtTitle: 'Wet Bulb Globe Temperature Risk Scale',
+      scaleLow: 'Low (60°F)',
+      scaleMid: 'Caution (75°F)',
+      scaleHigh: 'High risk (90°F+)',
+      aiLabel: 'AI Safety Assessment',
+      btnSearch: 'Check location',
+      btnGps: 'Use GPS',
+      placeholder: 'City, zip code, or address...',
+      footerWb: 'Wet bulb: Stull (2011)',
+      locating: 'Locating...',
+      searching: 'Searching...',
+      currentLoc: 'Current location',
+      gpsError: 'GPS permission denied. Enter a location manually.',
+      weatherError: 'Failed to load weather data. Try again.',
+      notFound: 'Location not found. Try a city name, zip code, or full address.',
+      assessError: 'Assessment unavailable. Review the metrics above manually.',
+      langBtn: '🌐 Español',
+      safeText: 'Safe for outdoor activity',
+      cautionText: 'Use caution outdoors',
+      warningText: 'Limit outdoor exertion',
+      dangerText: 'Dangerous outdoor conditions',
+      aqi: ['Good','Moderate','Unhealthy (sensitive)','Unhealthy','Very Unhealthy','Hazardous'],
+      promptLang: 'English',
+    },
+    es: {
+      appTitle: 'Monitor de Seguridad al Aire Libre',
+      safetyLevel: 'Estado de seguridad exterior',
+      labelTemp: 'Temperatura',
+      labelAqi: 'Calidad del aire (ICA)',
+      labelWb: 'Temp. de bulbo húmedo',
+      wbgtTitle: 'Escala de riesgo de temperatura de bulbo húmedo',
+      scaleLow: 'Bajo (60°F)',
+      scaleMid: 'Precaución (75°F)',
+      scaleHigh: 'Alto riesgo (90°F+)',
+      aiLabel: 'Evaluación de seguridad IA',
+      btnSearch: 'Buscar ubicación',
+      btnGps: 'Usar GPS',
+      placeholder: 'Ciudad, código postal o dirección...',
+      footerWb: 'Bulbo húmedo: Stull (2011)',
+      locating: 'Localizando...',
+      searching: 'Buscando...',
+      currentLoc: 'Ubicación actual',
+      gpsError: 'Permiso GPS denegado. Ingresa una ubicación manualmente.',
+      weatherError: 'Error al cargar datos del clima. Inténtalo de nuevo.',
+      notFound: 'Ubicación no encontrada. Prueba con ciudad, código postal o dirección.',
+      assessError: 'Evaluación no disponible. Revisa los datos manualmente.',
+      langBtn: '🌐 English',
+      safeText: 'Seguro para actividades al aire libre',
+      cautionText: 'Usa precaución en exteriores',
+      warningText: 'Limita el esfuerzo al aire libre',
+      dangerText: 'Condiciones exteriores peligrosas',
+      aqi: ['Buena','Moderada','No saludable (sensibles)','No saludable','Muy no saludable','Peligrosa'],
+      promptLang: 'Spanish',
+    }
+  };
+
+  function t(key) { return STRINGS[lang][key] || STRINGS.en[key] || key; }
+
+  function applyLang() {
+    const s = STRINGS[lang];
+    document.title = s.appTitle;
+    setText('appTitle', s.appTitle);
+    setText('safetyLevel', s.safetyLevel);
+    setText('labelTemp', s.labelTemp);
+    setText('labelAqi', s.labelAqi);
+    setText('labelWb', s.labelWb);
+    setText('wbgtTitle', s.wbgtTitle);
+    setText('scaleLow', s.scaleLow);
+    setText('scaleMid', s.scaleMid);
+    setText('scaleHigh', s.scaleHigh);
+    setText('aiLabel', s.aiLabel);
+    setText('btnSearch', s.btnSearch);
+    setText('btnGps', s.btnGps);
+    setText('langToggle', s.langBtn);
+    const input = document.getElementById('locInput');
+    if (input) input.placeholder = s.placeholder;
+    // Re-apply safety banner text if data loaded
+    if (appState.temp != null) {
+      const level = safetyLevel(appState.temp, appState.aqi, appState.wbTemp);
+      const textMap = { safe: s.safeText, caution: s.cautionText, warning: s.warningText, danger: s.dangerText };
+      setText('safetyText', textMap[level]);
+    }
+  }
+
+  function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+
+  function toggleLang() {
+    lang = lang === 'en' ? 'es' : 'en';
+    applyLang();
+    // Re-run assessment in new language if data is loaded
+    if (appState.temp != null) fetchAssessment();
+  }
+
+  // ── Auto-load on start ─────────────────────────────
   useGPS();
 </script>
 </body>
