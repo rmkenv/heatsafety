@@ -18,7 +18,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
 
-  const { temp, humidity, aqi, wbTemp, city } = req.body || {};
+  const { temp, humidity, aqi, wbTemp, city, lang } = req.body || {};
+  const respondIn = lang === "es" ? "Spanish" : "English";
 
   if (temp == null || humidity == null || aqi == null || wbTemp == null)
     return res.status(400).json({ error: "Missing required fields" });
@@ -29,7 +30,7 @@ module.exports = async function handler(req, res) {
 - AQI: ${Math.round(aqi)} (${aqiLabel(aqi)})
 - Wet bulb temperature: ${Math.round(wbTemp)}°F
 
-In 2-3 concise sentences, assess outdoor safety for a typical healthy adult. Note specific risks and give one practical recommendation. Be direct.`;
+Respond in ${respondIn}. In 2-3 concise sentences, assess outdoor safety for a typical healthy adult. Note specific risks and give one practical recommendation. Be direct.`;
 
   const payload = JSON.stringify({
     model: "gpt-oss:20b-cloud",

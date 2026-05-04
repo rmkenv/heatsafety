@@ -475,7 +475,7 @@
       const resp = await fetch('/api/assess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ temp, humidity, aqi, wbTemp, city }),
+        body: JSON.stringify({ temp, humidity, aqi, wbTemp, city, lang }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'API error ' + resp.status);
