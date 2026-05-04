@@ -30,12 +30,12 @@ module.exports = async function handler(req, res) {
 - AQI: ${Math.round(aqi)} (${aqiLabel(aqi)})
 - Wet bulb temperature: ${Math.round(wbTemp)}°F
 
-Respond in ${respondIn}. In 2-3 concise sentences, assess outdoor safety for a typical healthy adult. Note specific risks and give one practical recommendation. Be direct.`;
+Respond in ${respondIn}. Write exactly 2-3 sentences. Assess outdoor safety for a typical healthy adult, note the dominant risk, and give one practical recommendation. No preamble, no bullet points, no sign-off.`;
 
   const payload = JSON.stringify({
     model: "gpt-oss:20b-cloud",
     messages: [{ role: "user", content: prompt }],
-    max_tokens: 250,
+    max_tokens: 350,
     stream: false,
   });
 
