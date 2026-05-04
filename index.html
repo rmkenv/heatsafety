@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Outdoor Safety Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f4f0;
+      --surface: #ffffff;
+      --surface2: #eeede8;
+      --border: rgba(0,0,0,0.09);
+      --border-strong: rgba(0,0,0,0.18);
+      --text: #1a1a18;
+      --text-muted: #6b6b66;
+      --text-dim: #9a9a94;
+      --radius-md: 8px;
+      --radius-lg: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141412;
+        --surface: #1e1e1c;
+        --surface2: #252523;
+        --border: rgba(255,255,255,0.08);
+        --border-strong: rgba(255,255,255,0.16);
+        --text: #f0ede8;
+        --text-muted: #9a9a94;
+        --text-dim: #6b6b66;
+      }
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .app {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    .header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .header-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .header-loc {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* Safety banner */
+    .safety-banner {
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: background 0.4s, border-color 0.4s, color 0.4s;
+    }
+    .safety-icon {
+      font-family: 'Space Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      flex-shrink: 0;
+      width: 32px;
+      text-align: center;
+    }
+    .safety-level {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+      opacity: 0.65;
+    }
+    .safety-text {
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    .level-safe    { background: #eaf3de; border-color: #639922; color: #27500a; }
+    .level-caution { background: #faeeda; border-color: #ef9f27; color: #633806; }
+    .level-warning { background: #faece7; border-color: #d85a30; color: #4a1b0c; }
+    .level-danger  { background: #fcebeb; border-color: #e24b4a; color: #501313; }
+
+    @media (prefers-color-scheme: dark) {
+      .level-safe    { background: #173404; border-color: #3b6d11; color: #c0dd97; }
+      .level-caution { background: #412402; border-color: #854f0b; color: #fac775; }
+      .level-warning { background: #4a1b0c; border-color: #993c1d; color: #f0997b; }
+      .level-danger  { background: #501313; border-color: #a32d2d; color: #f7c1c1; }
+    }
+
+    /* Metric cards */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 520px) {
+      .metrics { grid-template-columns: 1fr 1fr; }
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.1rem;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .metric-val {
+      font-family: 'Space Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+    .metric-unit {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      min-height: 18px;
+    }
+    .metric-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .metric-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.8s ease;
+    }
+
+    /* WBGT scale */
+    .wbgt-scale {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .wbgt-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .scale-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(to right, #378add, #639922, #ef9f27, #d85a30, #e24b4a);
+      position: relative;
+      margin-bottom: 8px;
+    }
+    .scale-needle {
+      position: absolute;
+      top: -5px;
+      width: 2px;
+      height: 18px;
+      background: var(--text);
+      border-radius: 1px;
+      transform: translateX(-50%);
+      transition: left 0.8s ease;
+    }
+    .scale-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* AI section */
+    .ai-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      min-height: 90px;
+    }
+    .ai-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    .ai-text {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .ai-model {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+    }
+    .dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:0.25} 40%{opacity:1} }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .loc-input {
+      flex: 1;
+      min-width: 180px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 9px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+    }
+    .loc-input:focus {
+      border-color: #378add;
+      box-shadow: 0 0 0 3px rgba(55,138,221,0.12);
+    }
+    .btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--surface2); }
+    .btn:active { transform: scale(0.98); }
+
+    .error-msg {
+      font-size: 13px;
+      color: #e24b4a;
+      margin-top: 8px;
+      min-height: 20px;
+    }
+
+    .footer {
+      margin-top: 2.5rem;
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .footer a { color: var(--text-dim); text-decoration: underline; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <span class="header-title">Outdoor Safety Monitor</span>
+    <span class="header-loc" id="locLabel">Locating...</span>
+  </div>
+
+  <div class="safety-banner level-safe" id="safetyBanner">
+    <div class="safety-icon" id="safetyIcon">–</div>
+    <div>
+      <div class="safety-level">Outdoor safety status</div>
+      <div class="safety-text" id="safetyText">Loading conditions...</div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Temperature</div>
+      <div class="metric-val" id="tempVal">--</div>
+      <div class="metric-unit">°F</div>
+      <div class="metric-bar"><div class="metric-fill" id="tempBar" style="width:0%;background:#d85a30"></div></div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Air Quality (AQI)</div>
+      <div class="metric-val" id="aqiVal">--</div>
+      <div class="metric-unit" id="aqiDesc">Index</div>
+      <div class="metric-bar"><div class="metric-fill" id="aqiBar" style="width:0%;background:#378add"></div></div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Wet Bulb Temp</div>
+      <div class="metric-val" id="wbVal">--</div>
+      <div class="metric-unit">°F</div>
+      <div class="metric-bar"><div class="metric-fill" id="wbBar" style="width:0%;background:#ef9f27"></div></div>
+    </div>
+  </div>
+
+  <div class="wbgt-scale">
+    <div class="wbgt-title">Wet Bulb Globe Temperature Risk Scale</div>
+    <div class="scale-bar">
+      <div class="scale-needle" id="wbNeedle" style="left:0%"></div>
+    </div>
+    <div class="scale-labels">
+      <span>Low (60°F)</span>
+      <span>Caution (75°F)</span>
+      <span>High risk (90°F+)</span>
+    </div>
+  </div>
+
+  <div class="ai-section">
+    <div class="ai-label">AI Safety Assessment</div>
+    <div class="ai-text" id="aiText">
+      <div class="dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="ai-model" id="aiModel"></div>
+  </div>
+
+  <div class="controls">
+    <input class="loc-input" id="locInput" type="text" placeholder="City, zip code, or address..." />
+    <button class="btn" onclick="handleSearch()">Check location</button>
+    <button class="btn" onclick="useGPS()">Use GPS</button>
+  </div>
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="footer">
+    <span>Weather &amp; AQI: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></span>
+    <span>Assessment: <a href="https://ollama.com" target="_blank" rel="noopener">Ollama Cloud</a> / gpt-oss:20b</span>
+    <span>Wet bulb: Stull (2011)</span>
+  </div>
+
+</div>
+
+<script>
+  const WEATHER_BASE     = 'https://api.open-meteo.com/v1/forecast';
+  const AIR_QUALITY_BASE = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+  const GEOCODE_BASE     = 'https://geocoding-api.open-meteo.com/v1/search';
+  const NOMINATIM_BASE   = 'https://nominatim.openstreetmap.org/reverse';
+
+  let appState = { temp: null, humidity: null, aqi: null, wbTemp: null, city: '' };
+
+  // Stull (2011) wet bulb approximation
+  function calcWetBulbF(tempF, rh) {
+    const T  = (tempF - 32) * 5 / 9;
+    const Tw = T * Math.atan(0.151977 * Math.pow(rh + 8.313659, 0.5))
+             + Math.atan(T + rh)
+             - Math.atan(rh - 1.676331)
+             + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh)
+             - 4.686035;
+    return +(Tw * 9 / 5 + 32).toFixed(1);
+  }
+
+  function aqiLabel(v) {
+    if (v <= 50)  return 'Good';
+    if (v <= 100) return 'Moderate';
+    if (v <= 150) return 'Unhealthy (sensitive)';
+    if (v <= 200) return 'Unhealthy';
+    if (v <= 300) return 'Very Unhealthy';
+    return 'Hazardous';
+  }
+
+  function aqiColor(v) {
+    if (v <= 50)  return '#639922';
+    if (v <= 100) return '#ef9f27';
+    if (v <= 150) return '#d85a30';
+    if (v <= 200) return '#e24b4a';
+    return '#993c1d';
+  }
+
+  function safetyLevel(tempF, aqi, wbF) {
+    if (wbF >= 90 || tempF >= 105 || aqi >= 201) return 'danger';
+    if (wbF >= 82 || tempF >= 95  || aqi >= 151) return 'warning';
+    if (wbF >= 75 || tempF >= 85  || aqi >= 101) return 'caution';
+    return 'safe';
+  }
+
+  const LEVEL_META = {
+    safe:    { icon: '✓', text: 'Safe for outdoor activity' },
+    caution: { icon: '!', text: 'Use caution outdoors' },
+    warning: { icon: '⚠', text: 'Limit outdoor exertion' },
+    danger:  { icon: '✕', text: 'Dangerous outdoor conditions' },
+  };
+
+  function updateUI() {
+    const { temp, humidity, aqi, wbTemp, city } = appState;
+    if (temp == null) return;
+
+    document.getElementById('locLabel').textContent = city || '';
+    document.getElementById('tempVal').textContent  = Math.round(temp);
+    document.getElementById('aqiVal').textContent   = Math.round(aqi);
+    document.getElementById('aqiDesc').textContent  = aqiLabel(aqi);
+    document.getElementById('wbVal').textContent    = Math.round(wbTemp);
+
+    const tempPct = Math.min(100, Math.max(0, (temp - 32) / (115 - 32) * 100));
+    const aqiPct  = Math.min(100, aqi / 300 * 100);
+    const wbPct   = Math.min(100, Math.max(0, (wbTemp - 50) / (100 - 50) * 100));
+
+    document.getElementById('tempBar').style.width = tempPct + '%';
+    document.getElementById('aqiBar').style.width  = aqiPct + '%';
+    document.getElementById('aqiBar').style.background = aqiColor(aqi);
+    document.getElementById('wbBar').style.width   = wbPct + '%';
+
+    const needlePct = Math.min(100, Math.max(0, (wbTemp - 60) / (95 - 60) * 100));
+    document.getElementById('wbNeedle').style.left = needlePct + '%';
+
+    const level = safetyLevel(temp, aqi, wbTemp);
+    const meta  = LEVEL_META[level];
+    const banner = document.getElementById('safetyBanner');
+    banner.className = 'safety-banner level-' + level;
+    document.getElementById('safetyIcon').textContent = meta.icon;
+    document.getElementById('safetyText').textContent = meta.text;
+
+    fetchAssessment();
+  }
+
+  async function fetchAssessment() {
+    const { temp, humidity, aqi, wbTemp, city } = appState;
+    const aiEl = document.getElementById('aiText');
+    const modelEl = document.getElementById('aiModel');
+    aiEl.innerHTML = '<div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+    modelEl.textContent = '';
+
+    try {
+      const resp = await fetch('/api/assess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ temp, humidity, aqi, wbTemp, city }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'API error');
+      aiEl.textContent = data.assessment;
+      modelEl.textContent = 'gpt-oss:20b via Ollama Cloud';
+    } catch (e) {
+      aiEl.textContent = 'Assessment unavailable. Review the metrics above manually.';
+      console.error(e);
+    }
+  }
+
+  async function fetchWeather(lat, lon, cityName) {
+    setError('');
+    try {
+      const [wResp, aResp] = await Promise.all([
+        fetch(`${WEATHER_BASE}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m&temperature_unit=fahrenheit&timezone=auto`),
+        fetch(`${AIR_QUALITY_BASE}?latitude=${lat}&longitude=${lon}&current=us_aqi&timezone=auto`),
+      ]);
+
+      const [wData, aData] = await Promise.all([wResp.json(), aResp.json()]);
+
+      const temp     = wData.current?.temperature_2m;
+      const humidity = wData.current?.relative_humidity_2m;
+      const aqi      = aData.current?.us_aqi ?? 30;
+
+      appState = { temp, humidity, aqi, wbTemp: calcWetBulbF(temp, humidity), city: cityName };
+      updateUI();
+    } catch (e) {
+      setError('Failed to load weather data. Try again.');
+      document.getElementById('locLabel').textContent = '';
+    }
+  }
+
+  async function geocode(query) {
+    const resp = await fetch(`${GEOCODE_BASE}?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
+    const data = await resp.json();
+    const r = data.results?.[0];
+    if (!r) throw new Error('Location not found');
+    return {
+      lat:  r.latitude,
+      lon:  r.longitude,
+      name: [r.name, r.admin1 || r.country].filter(Boolean).join(', '),
+    };
+  }
+
+  async function handleSearch() {
+    const q = document.getElementById('locInput').value.trim();
+    if (!q) return;
+    document.getElementById('locLabel').textContent = 'Searching...';
+    try {
+      const loc = await geocode(q);
+      await fetchWeather(loc.lat, loc.lon, loc.name);
+    } catch (e) {
+      setError('Location not found. Try a city name or zip code.');
+      document.getElementById('locLabel').textContent = '';
+    }
+  }
+
+  function useGPS() {
+    if (!navigator.geolocation) {
+      setError('GPS not available in this browser.');
+      return;
+    }
+    document.getElementById('locLabel').textContent = 'Locating...';
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        try {
+          const r    = await fetch(`${NOMINATIM_BASE}?lat=${lat}&lon=${lon}&format=json`);
+          const d    = await r.json();
+          const city = d.address?.city || d.address?.town || d.address?.county || 'Current location';
+          const st   = d.address?.state_code || '';
+          await fetchWeather(lat, lon, `${city}${st ? ', ' + st : ''}`);
+        } catch {
+          await fetchWeather(lat, lon, 'Current location');
+        }
+      },
+      () => setError('GPS permission denied. Enter a location manually.')
+    );
+  }
+
+  function setError(msg) {
+    document.getElementById('errorMsg').textContent = msg;
+  }
+
+  document.getElementById('locInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleSearch();
+  });
+
+  // Auto-load on start
+  useGPS();
+</script>
+</body>
+</html>
