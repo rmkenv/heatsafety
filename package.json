@@ -1,8 +1,9 @@
 {
   "name": "outdoor-safety-monitor",
   "version": "1.0.0",
-  "description": "Outdoor safety monitor using temperature, AQI, and wet bulb temperature with Ollama AI assessment",
+  "description": "Outdoor safety monitor — temperature, AQI, wet bulb + Ollama AI",
   "private": true,
+  "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0"
   },
