@@ -1,4 +1,4 @@
-# Outdoor Safety Monitor
+# Outdoor Safety Screening Tool
 
 Real-time outdoor safety dashboard combining temperature, air quality (AQI), and wet bulb temperature with an AI-generated safety assessment powered by Ollama Cloud.
 
