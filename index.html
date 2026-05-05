@@ -306,13 +306,36 @@
       flex-wrap: wrap;
     }
     .footer a { color: var(--text-dim); text-decoration: underline; }
+
+    .disclaimer {
+      margin-top: 1.25rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--surface2);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .disclaimer-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .disclaimer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
 <div class="app">
 
   <div class="header">
-    <span class="header-title" id="appTitle">Outdoor Safety Monitor</span>
+    <span class="header-title" id="appTitle">Heat Risk Awareness Tool</span>
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="btn lang-btn" id="langToggle" onclick="toggleLang()" style="padding:5px 10px;font-size:12px;">🌐 Español</button>
       <span class="header-loc" id="locLabel">Locating...</span>
@@ -354,9 +377,9 @@
       <div class="scale-needle" id="wbNeedle" style="left:0%"></div>
     </div>
     <div class="scale-labels">
-      <span id="scaleLow">Low (60°F)</span>
-      <span id="scaleMid">Caution (75°F)</span>
-      <span id="scaleHigh">High risk (90°F+)</span>
+      <span id="scaleLow">Low (55°F)</span>
+      <span id="scaleMid">Caution (72°F)</span>
+      <span id="scaleHigh">Danger (86°F+)</span>
     </div>
   </div>
 
@@ -377,10 +400,15 @@
   </div>
   <div class="error-msg" id="errorMsg"></div>
 
+  <div class="disclaimer">
+    <div class="disclaimer-title" id="disclaimerTitle">Limitations &amp; intended use</div>
+    <span id="disclaimerText">This tool provides <strong>screening-level estimates only</strong>. True heat stress (WBGT) requires field instruments measuring wind speed, solar radiation, and humidity — such as a Kestrel Heat Stress Meter. Modeled wet bulb temperature cannot account for radiant heat load or wind cooling, and may underestimate risk on sunny, calm days. <strong>This tool is not a substitute for validated on-site measurement</strong> in occupational, athletic, or clinical settings. Thresholds shown are for healthy adults at rest; risk is lower for elderly, children, and those with health conditions. Always follow local heat advisories.</span>
+  </div>
+
   <div class="footer">
     <span>Weather &amp; AQI: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a></span>
     <span id="footerAssessment">Assessment: <a href="https://ollama.com" target="_blank" rel="noopener">Ollama Cloud</a> / gpt-oss:20b</span>
-    <span id="footerWb">Wet bulb: Stull (2011)</span>
+    <span id="footerWb">Wet bulb: Raymond et al. (2020)</span>
   </div>
 
 </div>
@@ -394,13 +422,33 @@
   let appState = { temp: null, humidity: null, aqi: null, wbTemp: null, city: '' };
 
   // Stull (2011) wet bulb approximation
+  // Wet bulb via Newton-Raphson psychrometric convergence
+  // Replaces Stull (2011) to remove bias identified by Buzan et al. (2015)
+  // Based on Raymond et al. (2020) doi:10.1126/sciadv.aaw1838
+  function satVapPres(Tc) {
+    // Buck (1981) equation, accurate to ±0.05% over 0–50°C
+    return 0.61121 * Math.exp((18.678 - Tc / 234.5) * (Tc / (257.14 + Tc))); // kPa
+  }
   function calcWetBulbF(tempF, rh) {
-    const T  = (tempF - 32) * 5 / 9;
-    const Tw = T * Math.atan(0.151977 * Math.pow(rh + 8.313659, 0.5))
-             + Math.atan(T + rh)
-             - Math.atan(rh - 1.676331)
-             + 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh)
-             - 4.686035;
+    const T  = (tempF - 32) * 5 / 9;   // °C
+    const P  = 101.325;                  // kPa standard atmosphere
+    const A  = 6.6e-4;                   // psychrometric constant /°C
+    const eT = satVapPres(T);
+    const eA = eT * rh / 100;           // actual vapour pressure
+    // Initial guess: dew point approximation
+    let Tw = T * (rh / 100) + (T - 14.55 - 0.114 * T) * (1 - rh / 100);
+    Tw = Math.max(-40, Math.min(T, Tw));
+    // Newton-Raphson iteration (converges in ~5 iterations)
+    for (let i = 0; i < 30; i++) {
+      const eTw  = satVapPres(Tw);
+      const f    = eTw - eA - A * P * (T - Tw);
+      const deTw = eTw * (18.678 - 2 * Tw / 234.5) / (257.14 + Tw)
+                 - eTw * Tw / (234.5 * (257.14 + Tw));
+      const df   = deTw + A * P;
+      const dTw  = f / df;
+      Tw -= dTw;
+      if (Math.abs(dTw) < 1e-5) break;
+    }
     return +(Tw * 9 / 5 + 32).toFixed(1);
   }
 
@@ -422,10 +470,17 @@
     return '#993c1d';
   }
 
+  // Wet bulb thresholds based on revised survivability science:
+  // Danger  >= 86°F (30°C): approaching revised human survivability limit
+  //           (Zhang et al. 2021 doi:10.1152/japplphysiol.00738.2021)
+  //           Note: 35°C (Sherwood & Huber 2010) has been revised downward
+  //           to ~30.5°C for healthy adults at rest; lower for vulnerable populations
+  // Warning >= 79°F (26°C): significant physiological strain; vulnerable at risk
+  // Caution >= 72°F (22°C): outdoor exertion risk (OSHA action level)
   function safetyLevel(tempF, aqi, wbF) {
-    if (wbF >= 90 || tempF >= 105 || aqi >= 201) return 'danger';
-    if (wbF >= 82 || tempF >= 95  || aqi >= 151) return 'warning';
-    if (wbF >= 75 || tempF >= 85  || aqi >= 101) return 'caution';
+    if (wbF >= 86 || tempF >= 105 || aqi >= 201) return 'danger';
+    if (wbF >= 79 || tempF >= 95  || aqi >= 151) return 'warning';
+    if (wbF >= 72 || tempF >= 85  || aqi >= 101) return 'caution';
     return 'safe';
   }
 
@@ -458,7 +513,7 @@
     document.getElementById('aqiBar').style.background = aqiColor(aqi);
     document.getElementById('wbBar').style.width   = wbPct + '%';
 
-    const needlePct = Math.min(100, Math.max(0, (wbTemp - 60) / (95 - 60) * 100));
+    const needlePct = Math.min(100, Math.max(0, (wbTemp - 55) / (95 - 55) * 100));
     document.getElementById('wbNeedle').style.left = needlePct + '%';
 
     const level = safetyLevel(temp, aqi, wbTemp);
@@ -603,20 +658,20 @@
 
   const STRINGS = {
     en: {
-      appTitle: 'Outdoor Safety Monitor',
+      appTitle: 'Heat Risk Awareness Tool',
       safetyLevel: 'Outdoor safety status',
       labelTemp: 'Temperature',
       labelAqi: 'Air Quality (AQI)',
       labelWb: 'Wet Bulb Temp',
       wbgtTitle: 'Wet Bulb Globe Temperature Risk Scale',
-      scaleLow: 'Low (60°F)',
-      scaleMid: 'Caution (75°F)',
-      scaleHigh: 'High risk (90°F+)',
-      aiLabel: 'AI Safety Assessment',
+      scaleLow: 'Low (55°F)',
+      scaleMid: 'Caution (72°F)',
+      scaleHigh: 'Danger (86°F+)',
+      aiLabel: 'AI Screening Assessment',
       btnSearch: 'Check location',
       btnGps: 'Use GPS',
       placeholder: 'City, zip code, or address...',
-      footerWb: 'Wet bulb: Stull (2011)',
+      footerWb: 'Wet bulb: Raymond et al. (2020)',
       locating: 'Locating...',
       searching: 'Searching...',
       currentLoc: 'Current location',
@@ -631,22 +686,24 @@
       dangerText: 'Dangerous outdoor conditions',
       aqi: ['Good','Moderate','Unhealthy (sensitive)','Unhealthy','Very Unhealthy','Hazardous'],
       promptLang: 'English',
+      disclaimerTitle: 'Limitations & intended use',
+      disclaimerText: 'This tool provides <strong>screening-level estimates only</strong>. True heat stress (WBGT) requires field instruments measuring wind speed, solar radiation, and humidity — such as a Kestrel Heat Stress Meter. Modeled wet bulb temperature cannot account for radiant heat load or wind cooling, and may underestimate risk on sunny, calm days. <strong>This tool is not a substitute for validated on-site measurement</strong> in occupational, athletic, or clinical settings. Thresholds shown are for healthy adults at rest; risk is lower for elderly, children, and those with health conditions. Always follow local heat advisories.',
     },
     es: {
-      appTitle: 'Monitor de Seguridad al Aire Libre',
+      appTitle: 'Herramienta de Concienciación sobre Riesgo Térmico',
       safetyLevel: 'Estado de seguridad exterior',
       labelTemp: 'Temperatura',
       labelAqi: 'Calidad del aire (ICA)',
       labelWb: 'Temp. de bulbo húmedo',
       wbgtTitle: 'Escala de riesgo de temperatura de bulbo húmedo',
-      scaleLow: 'Bajo (60°F)',
-      scaleMid: 'Precaución (75°F)',
-      scaleHigh: 'Alto riesgo (90°F+)',
-      aiLabel: 'Evaluación de seguridad IA',
+      scaleLow: 'Bajo (55°F)',
+      scaleMid: 'Precaución (72°F)',
+      scaleHigh: 'Peligro (86°F+)',
+      aiLabel: 'Evaluación de detección IA',
       btnSearch: 'Buscar ubicación',
       btnGps: 'Usar GPS',
       placeholder: 'Ciudad, código postal o dirección...',
-      footerWb: 'Bulbo húmedo: Stull (2011)',
+      footerWb: 'Bulbo húmedo: Raymond et al. (2020)',
       locating: 'Localizando...',
       searching: 'Buscando...',
       currentLoc: 'Ubicación actual',
@@ -661,6 +718,8 @@
       dangerText: 'Condiciones exteriores peligrosas',
       aqi: ['Buena','Moderada','No saludable (sensibles)','No saludable','Muy no saludable','Peligrosa'],
       promptLang: 'Spanish',
+      disclaimerTitle: 'Limitaciones y uso previsto',
+      disclaimerText: 'Esta herramienta proporciona <strong>solo estimaciones de nivel de detección</strong>. El estrés térmico real (WBGT) requiere instrumentos de campo que midan la velocidad del viento, la radiación solar y la humedad, como un medidor Kestrel. La temperatura de bulbo húmedo modelada no puede tener en cuenta la carga de calor radiante ni el enfriamiento por viento. <strong>Esta herramienta no sustituye a las mediciones validadas in situ</strong> en entornos laborales, deportivos o clínicos. Los umbrales mostrados corresponden a adultos sanos en reposo; el riesgo es mayor en personas mayores, niños y personas con condiciones de salud. Siga siempre los avisos de calor locales.',
     }
   };
 
@@ -681,6 +740,9 @@
     setText('aiLabel', s.aiLabel);
     setText('btnSearch', s.btnSearch);
     setText('btnGps', s.btnGps);
+    setText('disclaimerTitle', s.disclaimerTitle);
+    const disclaimerEl = document.getElementById('disclaimerText');
+    if (disclaimerEl) disclaimerEl.innerHTML = s.disclaimerText;
     setText('langToggle', s.langBtn);
     const input = document.getElementById('locInput');
     if (input) input.placeholder = s.placeholder;
